@@ -33,6 +33,7 @@ public sealed class TcpScaleServer : IAsyncDisposable
                 using var stream = client.GetStream();
                 // Observe peer EOF independently of the frame interval, including while paused.
                 var peer = WatchPeer(stream, session);
+                bool failureReported = false;
                 try
                 {
                     while(!session.IsCancellationRequested)
@@ -54,9 +55,18 @@ public sealed class TcpScaleServer : IAsyncDisposable
                 catch(Exception ex) when(ex is IOException or SocketException or OperationCanceledException)
                 {
                     if(!ct.IsCancellationRequested && !session.IsCancellationRequested)
+                    {
                         Status?.Invoke("Disconnected: " + ex.Message);
+                        failureReported = true;
+                    }
                 }
-                finally { session.Cancel(); await peer; }
+                finally
+                {
+                    session.Cancel();
+                    string? readFailure = await peer;
+                    if(readFailure != null && !ct.IsCancellationRequested && !failureReported)
+                        Status?.Invoke("Disconnected: " + readFailure);
+                }
                 if(!ct.IsCancellationRequested) Status?.Invoke("Disconnected");
             }
         }
@@ -64,14 +74,19 @@ public sealed class TcpScaleServer : IAsyncDisposable
         catch(SocketException) when(ct.IsCancellationRequested) { }
         catch(Exception ex) { Status?.Invoke("Error: " + ex.Message); }
     }
-    static async Task WatchPeer(NetworkStream stream, CancellationTokenSource session)
+    static async Task<string?> WatchPeer(NetworkStream stream, CancellationTokenSource session)
     {
         try
         {
             var ignored = new byte[256];
             while(await stream.ReadAsync(ignored, session.Token) != 0) { }
+            return null;
         }
-        catch(Exception ex) when(ex is IOException or SocketException or OperationCanceledException) { }
+        catch(OperationCanceledException) when(session.IsCancellationRequested) { return null; }
+        catch(Exception ex) when(ex is IOException or SocketException)
+        {
+            return session.IsCancellationRequested ? null : ex.Message;
+        }
         finally { session.Cancel(); }
     }
     public async ValueTask DisposeAsync()

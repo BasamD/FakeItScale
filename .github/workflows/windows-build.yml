@@ -3,8 +3,9 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
+    tags: ['v*']
 permissions:
-  contents: read
+  contents: write
 jobs:
   windows:
     runs-on: windows-latest
@@ -16,10 +17,23 @@ jobs:
       - name: Test and package Windows executable
         shell: pwsh
         run: ./scripts/Publish.ps1
-      - name: Upload downloadable Windows ZIP
+      - name: Upload Windows download
         uses: actions/upload-artifact@v4
         with:
-          name: ScaleSim-1.1-Windows-x64
-          path: artifacts/ScaleSim-Windows-x64.zip
+          name: ScaleSim-1.2-Windows-x64
+          path: artifacts/ScaleSim-Windows-x64/
           if-no-files-found: error
           retention-days: 90
+      - name: Publish Windows UI previews for review
+        if: github.ref == 'refs/heads/main'
+        continue-on-error: true
+        shell: pwsh
+        run: ./scripts/Publish-Previews.ps1
+      - name: Publish versioned Windows release
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create $env:GITHUB_REF_NAME artifacts/ScaleSim-Windows-x64.zip artifacts/ScaleSim-Windows-x64.zip.sha256 --title "ScaleSim $env:GITHUB_REF_NAME" --notes-file docs/RELEASE-1.2.md
+          if ($LASTEXITCODE -ne 0) { throw 'Release publication failed.' }

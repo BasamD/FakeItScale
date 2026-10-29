@@ -1,10 +1,10 @@
-# ScaleSim 1.1
+# ScaleSim 1.2
 
 Windows 11 x64 desktop scale-indicator simulator, built with C# / .NET 10 and WinForms. **SIMULATION / TEST ONLY.**
 
 ## Download and run
 
-Extract `ScaleSim-Windows-x64.zip` to a folder on your Windows 11 PC and double-click `ScaleSim.exe`. This is a self-contained application: no .NET runtime installation is required. No administrator rights are required for localhost TCP operation. The build is unsigned; Windows may show an unknown-publisher warning. The Windows build workflow launches the packaged executable and checks the visible window, mode validation, live dial TCP output, and connection start/stop. The ZIP includes `Preview.png`, a screenshot captured on Windows. Complete the manual acceptance checks below before relying on WasteWORKS or virtual COM behavior.
+Extract `ScaleSim-Windows-x64.zip` to a folder on your Windows 11 PC and double-click `ScaleSim.exe`. This is a self-contained application: no .NET runtime installation is required. No administrator rights are required for localhost TCP operation. The build is unsigned; Windows may show an unknown-publisher warning. The Windows build workflow launches the packaged executable and checks the visible window, mode validation, live dial TCP output, connection start/stop, repeated-error counts, truck start/stop behavior, and control containment across resizing and larger fonts. The ZIP includes `Preview.png`, a screenshot captured on Windows. Complete the manual acceptance checks below before relying on WasteWORKS or virtual COM behavior.
 
 The ZIP is portable, not an installer. Preferences are stored in `%LOCALAPPDATA%\ScaleSim\settings.json`. No WasteWORKS database records or settings are modified by ScaleSim. Deleting the extracted folder removes the app; deleting that preferences folder removes saved settings.
 
@@ -47,10 +47,10 @@ On Windows, run `scripts/Publish.ps1` to build, launch-test the packaged window,
 
 ## A calmer testing screen
 
-The current simulated weight stays prominent. The dashboard separates session frames written, last transmitted weight/time, error count, and connection state. Automatic mode shows the current stable-send count and a progress bar. Only the selected mode and transport controls are shown. Inline messages explain rejected values while preserving the running mode.
+The current simulated weight stays prominent. The dashboard separates session frames written, last transmitted weight/time, error count, and connection state. Automatic mode shows the current successful stable-send count and a progress bar. Frames written counts completed local writes since Start connection; Last write retains the actual last frame and time after a reset or disconnect. Hover the statistics for their exact definitions. Only the selected mode and transport controls are shown. Inline messages explain rejected values while preserving the running mode.
 
-The truck illustration follows the **last transmitted** weight, in both modes: it moves onto the scale for positive weights and leaves at zero. Pause freezes it. Reduce motion removes movement and the send pulse. Animation never controls the transmission clock or claims a WasteWORKS capture acknowledgment.
+A continuous lineup of trucks moves during recent successful writes, including zero-weight frames. Pause, Stop, disconnect, and stale data freeze it in place. Reduce motion freezes the illustration while the scale feed keeps working. Animation never controls the transmission clock or claims a WasteWORKS capture acknowledgment.
 
-See [What's new in 1.1](docs/RELEASE-1.1.md). Saved preferences from 1.0.1 remain readable; only valid applied weight settings are saved, so an invalid draft cannot break next startup. Each new connection starts a fresh statistics session. Manual weight changes and automatic cycle resets do not erase the transport's session statistics.
+See [What's new in 1.2](docs/RELEASE-1.2.md). Sections measure their contents and stack in narrow windows. The window scrolls vertically when needed, keeping every control accessible. Saved preferences from 1.0.1 remain readable; only valid applied weight settings are saved, so an invalid draft cannot break next startup. Each new connection starts a fresh statistics session. Manual weight changes and automatic cycle resets do not erase the transport's session statistics.
 
 See [Windows acceptance](docs/WINDOWS-ACCEPTANCE.md) for remaining release validation. No WasteWORKS integration is claimed as verified; its help manual was referenced by the supplied requirements but was not uploaded.

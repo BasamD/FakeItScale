@@ -153,5 +153,76 @@ await TestAsync("TCP manual changes and automatic resume preserve complete stabl
     Equal(Convert.ToHexString(FrameEncoder.Encode(80)),Convert.ToHexString(await ReadFrame(client.GetStream())));
 });
 
+Test("Failed first write of a new automatic weight does not advance retained state", () => {
+    var e=new WeightEngine(); e.StartAutomatic(new(100,60,20));
+    for(int i=0;i<10;i++) Send(e);
+    var retained=e.State;
+    for(int i=0;i<4;i++) { Equal(80,e.Next()!.Weight); Equal(retained,e.State); }
+    e.Reconnected();
+    for(int i=0;i<10;i++) Equal(100,Send(e).Weight);
+    Equal(80,Send(e).Weight); Equal(1,e.State.Repeated);
+});
+Test("Only the latest prepared frame can commit and only once", () => {
+    var e=new WeightEngine(); e.Automatic();
+    var stale=e.Next()!; var current=e.Next()!;
+    e.Commit(stale); Equal(0L,e.State.Completed);
+    e.Commit(current); e.Commit(current); Equal(1L,e.State.Completed); Equal(1,e.State.Repeated);
+    for(int i=0;i<9;i++) Send(e);
+    var next=e.Next()!; Equal(19980,next.Weight); Equal(20000,e.State.Weight);
+    e.Commit(next); Equal(19980,e.State.Weight); Equal(1,e.State.Repeated);
+});
+Test("Actual write statistics include a completed in-flight frame after a mode change", () => {
+    var e=new WeightEngine(); e.Automatic(); var ticket=e.Next()!;
+    e.Manual(12000); e.Commit(ticket);
+    var monitor=new ActivityMonitor(); monitor.Sent(ticket);
+    Equal(12000,e.State.Weight); Equal(0,e.State.Repeated);
+    Equal(1L,monitor.Snapshot.Writes); Equal(14L,monitor.Snapshot.Bytes); Equal(20000,monitor.Snapshot.LastFrame!.Weight);
+});
+Test("Feed freshness uses elapsed time and expires independently of the wall clock or weight", () => {
+    var clock=new AdjustableTimeProvider(); var monitor=new ActivityMonitor(timeProvider:clock);
+    Equal(false,monitor.Snapshot.HasRecentWrite(500));
+    var e=new WeightEngine(); e.Manual(0); monitor.Sent(Send(e));
+    var sentAt=monitor.Snapshot.LastWrite;
+    Equal(true,monitor.Snapshot.HasRecentWrite(500));
+    clock.Advance(TimeSpan.FromMilliseconds(700)); clock.JumpWallClock(TimeSpan.FromDays(-1));
+    Equal(sentAt,monitor.Snapshot.LastWrite); Equal(TimeSpan.FromMilliseconds(700),monitor.Snapshot.LastWriteAge!.Value);
+    Equal(true,monitor.Snapshot.HasRecentWrite(500));
+    clock.Advance(TimeSpan.FromMilliseconds(51)); clock.JumpWallClock(TimeSpan.FromDays(3));
+    Equal(false,monitor.Snapshot.HasRecentWrite(500));
+    monitor.Sent(Send(e)); Equal(true,monitor.Snapshot.HasRecentWrite(500)); Equal(2L,monitor.Snapshot.Writes);
+    monitor.Reset(); Equal(false,monitor.Snapshot.HasRecentWrite(500)); Equal<TimeSpan?>(null,monitor.Snapshot.LastWriteAge);
+});
+await TestAsync("An abruptly reset TCP peer records one connection error and listening resumes", async () => {
+    var e=new WeightEngine(); e.SetInterval(60000); int port=FreePort();
+    await using var server=new TcpScaleServer(e,port);
+    var resumed=new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+    int failures=0;
+    server.Status+=s=> {
+        if(s.StartsWith("Disconnected:")) Interlocked.Increment(ref failures);
+        if(s=="Listening" && Volatile.Read(ref failures)>0) resumed.TrySetResult();
+    };
+    server.Start();
+    using(var client=new TcpClient()) {
+        await client.ConnectAsync(IPAddress.Loopback,port); await ReadFrame(client.GetStream());
+        client.Client.LingerState=new LingerOption(true,0);
+        client.Client.Close(); // Abort the socket directly; TcpClient.Dispose first requests graceful shutdown.
+    }
+    await resumed.Task.WaitAsync(TimeSpan.FromSeconds(3));
+    Equal(1,Volatile.Read(ref failures));
+    using var next=new TcpClient(); await next.ConnectAsync(IPAddress.Loopback,port);
+    Equal(Convert.ToHexString(FrameEncoder.Encode(20000)),Convert.ToHexString(await ReadFrame(next.GetStream())));
+});
+
 Console.WriteLine($"{passed} passed; {failed} failed");
 return failed==0 ? 0 : 1;
+
+sealed class AdjustableTimeProvider : TimeProvider
+{
+    DateTimeOffset utcNow = new(2026,10,29,12,0,0,TimeSpan.Zero);
+    long timestamp;
+    public override DateTimeOffset GetUtcNow() => utcNow;
+    public override long GetTimestamp() => timestamp;
+    public override long TimestampFrequency => TimeSpan.TicksPerSecond;
+    public void Advance(TimeSpan elapsed) { timestamp += elapsed.Ticks; utcNow += elapsed; }
+    public void JumpWallClock(TimeSpan change) => utcNow += change;
+}

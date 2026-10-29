@@ -7,7 +7,7 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Publish failed.' }
     # Exercise the actual packaged Windows executable, including control construction.
     $process = Start-Process -FilePath (Resolve-Path 'artifacts/win-x64/ScaleSim.exe') -ArgumentList @('--smoke-test', '--screenshot', ('"' + (Join-Path (Get-Location) 'artifacts/Preview.png') + '"')) -PassThru
-    if (-not $process.WaitForExit(30000)) {
+    if (-not $process.WaitForExit(60000)) {
         Stop-Process -Id $process.Id -Force -ErrorAction SilentlyContinue
         throw 'Windows launch smoke test timed out.'
     }
@@ -20,15 +20,17 @@ try {
         }
         throw "Windows launch smoke test failed: exit $($process.ExitCode)."
     }
-    Write-Output 'PASS: Windows UI launch, mode validation, live dial TCP output, and start/stop checks.'
+    Write-Output 'PASS: Windows launch, responsive containment at 4 widths and 3 text sizes, UI/TCP controls, and activity-driven animation.'
     $staging = 'artifacts/ScaleSim-Windows-x64'
     New-Item -ItemType Directory -Force $staging | Out-Null
     Copy-Item artifacts/win-x64/ScaleSim.exe $staging
     Copy-Item README.md "$staging/README.txt"
     Copy-Item docs/WINDOWS-ACCEPTANCE.md "$staging/WINDOWS-ACCEPTANCE.txt"
     Copy-Item scripts/Test-Tcp.ps1 $staging
-    Copy-Item artifacts/Preview.png $staging
-    Copy-Item docs/RELEASE-1.1.md "$staging/WHATS-NEW.txt"
+    Copy-Item artifacts/Preview*.png $staging
+    Copy-Item docs/RELEASE-1.2.md "$staging/WHATS-NEW.txt"
     Compress-Archive -Path "$staging/*" -DestinationPath artifacts/ScaleSim-Windows-x64.zip -Force
-    Get-FileHash artifacts/ScaleSim-Windows-x64.zip -Algorithm SHA256
+    $hash = (Get-FileHash artifacts/ScaleSim-Windows-x64.zip -Algorithm SHA256).Hash.ToLowerInvariant()
+    Set-Content -Path artifacts/ScaleSim-Windows-x64.zip.sha256 -Value "$hash  ScaleSim-Windows-x64.zip"
+    Write-Output $hash
 } finally { Pop-Location }

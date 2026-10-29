@@ -60,17 +60,24 @@ public sealed class WeightEngine
         lock(gate)
         {
             if(paused) return null;
-            if(automatic && repeated >= settings.Repeats)
-            {
-                weight = weight - settings.Decrement < settings.Minimum ? settings.Start : weight - settings.Decrement;
-                repeated = 0;
-            }
-            return new(weight, FrameEncoder.Encode(weight), version);
+            // Preparing a frame must not advance a cycle. A failed boundary write leaves
+            // the retained weight/count intact, so a reconnect can give that weight a full hold.
+            int candidate = automatic && repeated >= settings.Repeats
+                ? weight - settings.Decrement < settings.Minimum ? settings.Start : weight - settings.Decrement
+                : weight;
+            return new(candidate, FrameEncoder.Encode(candidate), ++version);
         }
     }
     // Commit only after a complete transport write; stale writes cannot advance a changed session.
     public void Commit(FrameTicket ticket)
     {
-        lock(gate) { if(ticket.Version != version) return; completed++; if(repeated < int.MaxValue) repeated++; }
+        lock(gate)
+        {
+            if(ticket.Version != version) return;
+            version++; // A ticket may account for at most one completed write.
+            if(automatic && repeated >= settings.Repeats) { weight = ticket.Weight; repeated = 0; }
+            completed++;
+            if(repeated < int.MaxValue) repeated++;
+        }
     }
 }

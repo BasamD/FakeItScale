@@ -10,7 +10,7 @@ internal static class Theme
     public static readonly Color Border = Color.FromArgb(215, 224, 232);
     public static Font Font(float size = 10, bool bold = false) => new("Segoe UI", size, bold ? FontStyle.Bold : FontStyle.Regular);
     public static Label Label(string text, float size = 10, bool bold = false, Color? color = null) =>
-        new() { Text = text, AutoSize = true, ForeColor = color ?? Ink, Font = Font(size, bold), Margin = new Padding(0, 0, 6, 6) };
+        new WrappedLabel() { Text = text, ForeColor = color ?? Ink, Font = Font(size, bold), Margin = new Padding(0, 0, 6, 6) };
     public static GraphicsPath Round(RectangleF rect, float radius)
     {
         var path = new GraphicsPath(); float d = radius * 2;
@@ -19,9 +19,9 @@ internal static class Theme
         path.CloseFigure(); return path;
     }
 }
-internal sealed class Card : Panel
+internal sealed class Card : StackLayout
 {
-    public Card() { DoubleBuffered = true; BackColor = Color.White; Padding = new Padding(16); Margin = new Padding(0, 0, 0, 12); }
+    public Card() { DoubleBuffered = true; BackColor = Color.White; Padding = new Padding(16); Margin = Padding.Empty; }
     protected override void OnPaint(PaintEventArgs e)
     {
         base.OnPaint(e); e.Graphics.SmoothingMode = SmoothingMode.AntiAlias;

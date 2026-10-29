@@ -18,6 +18,7 @@ sealed class SerialTransport : IAsyncDisposable
     {
         await Task.Run(() => port.Open());
         engine.Reconnected();
+        status("Connected: " + port.PortName);
         task = Task.Run(async () => {
             try {
                 while(!stop.IsCancellationRequested) {
