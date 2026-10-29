@@ -4,7 +4,7 @@ Windows 11 x64 desktop scale-indicator simulator, built with C# / .NET 10 and Wi
 
 ## Download and run
 
-Extract `ScaleSim-Windows-x64.zip` to a folder on your Windows 11 PC and double-click `ScaleSim.exe`. This is a self-contained application: no .NET runtime installation is required. No administrator rights are required for localhost TCP operation. The build is unsigned; Windows may show an unknown-publisher warning. This release has not been launched on Windows in the build environment; complete the acceptance checks below before relying on it.
+Extract `ScaleSim-Windows-x64.zip` to a folder on your Windows 11 PC and double-click `ScaleSim.exe`. This is a self-contained application: no .NET runtime installation is required. No administrator rights are required for localhost TCP operation. The build is unsigned; Windows may show an unknown-publisher warning. The Windows build workflow launches the packaged executable and verifies that its main window becomes visible. Complete the manual acceptance checks below before relying on WasteWORKS or virtual COM behavior.
 
 The ZIP is portable, not an installer. Preferences are stored in `%LOCALAPPDATA%\ScaleSim\settings.json`. No WasteWORKS database records or settings are modified by ScaleSim. Deleting the extracted folder removes the app; deleting that preferences folder removes saved settings.
 
@@ -43,6 +43,6 @@ dotnet run --project tests/ScaleSim.Tests -c Release
 dotnet publish src/ScaleSim.Desktop -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o artifacts/win-x64
 ```
 
-Or run `scripts/Publish.ps1` to build and create the portable Windows ZIP. Tests use a dependency-free executable harness: a nonzero exit code signals failure. They exercise exact encoding, invalid input, 10-send progression, manual holds, pause/resume, cycle reset, failed-write accounting, reconnection, actual TCP output, and listener resource cleanup. The Windows desktop target can be cross-compiled from Linux with `EnableWindowsTargeting`; the UI and COM port operations require Windows to run.
+On Windows, run `scripts/Publish.ps1` to build, launch-test the packaged window, and create the portable Windows ZIP. Tests use a dependency-free executable harness: a nonzero exit code signals failure. They exercise exact encoding, invalid input, 10-send progression, manual holds, pause/resume, cycle reset, failed-write accounting, reconnection, actual TCP output, and listener resource cleanup. The Windows desktop target can be cross-compiled from Linux with `EnableWindowsTargeting`; the UI and COM port operations require Windows to run.
 
 See [Windows acceptance](docs/WINDOWS-ACCEPTANCE.md) for remaining release validation. No WasteWORKS integration is claimed as verified; its help manual was referenced by the supplied requirements but was not uploaded.

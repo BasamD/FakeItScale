@@ -27,7 +27,7 @@ public sealed class MainForm : Form
     bool busy, closing;
     readonly string settingsFile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "ScaleSim", "settings.json");
     static ComboBox Choice(params string[] items) { var c = new ComboBox { Width = 130, DropDownStyle = ComboBoxStyle.DropDownList }; c.Items.AddRange(items); c.SelectedIndex = 0; return c; }
-    static NumericUpDown Number(int value, int min, int max) => new() { Value = value, Minimum = min, Maximum = max, Width = 100 };
+    static NumericUpDown Number(int value, int min, int max) => new() { Maximum = max, Minimum = min, Value = value, Width = 100 };
     public MainForm()
     {
         Text = "ScaleSim — SIMULATION / TEST ONLY"; Width = 960; Height = 800; MinimumSize = new Size(850, 720);

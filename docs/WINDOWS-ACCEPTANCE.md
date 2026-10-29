@@ -1,6 +1,6 @@
 # Windows 11 acceptance checklist
 
-Build validation in Linux: 10 automated checks passed, including actual loopback TCP sends, reconnect, no-client freeze, and occupied-port handling. Self-contained win-x64 publish succeeded. Windows UI execution, actual WasteWORKS capture, physical/virtual serial operation, and code signing remain unverified.
+Build validation in Linux: 10 automated checks passed, including actual loopback TCP sends, reconnect, no-client freeze, and occupied-port handling. Self-contained win-x64 publish succeeded. The Windows publish script also launches the packaged executable, checks that the main window appears, and closes it cleanly. Full interactive UI behavior, actual WasteWORKS capture, physical/virtual serial operation, and code signing still require manual verification.
 
 1. Extract the portable ZIP and launch ScaleSim.exe on Windows 11 x64. Confirm window scaling, layout, keyboard input, and SIMULATION / TEST ONLY indicator.
 2. Choose Automatic with default values and Start connection. From PowerShell run `./Test-Tcp.ps1` (provided beside the executable) to check 21 exact frames: ten at 20,000, ten at 19,980, then 19,960. Restart the automatic cycle before each test.
