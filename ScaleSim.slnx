@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="src/ScaleSim.Core/ScaleSim.Core.csproj" />
+  <Project Path="src/ScaleSim.Desktop/ScaleSim.Desktop.csproj" />
+  <Project Path="tests/ScaleSim.Tests/ScaleSim.Tests.csproj" />
+</Solution>
