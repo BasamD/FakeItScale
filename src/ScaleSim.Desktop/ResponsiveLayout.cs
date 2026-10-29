@@ -114,3 +114,24 @@ internal sealed class WrappedLabel : Label
         return new Size(Math.Min(width,size.Width+Padding.Horizontal),size.Height+Padding.Vertical+2);
     }
 }
+
+internal sealed class ActionButton : Button
+{
+    public override Size GetPreferredSize(Size proposedSize)
+    {
+        // Button's native preferred size can retain an earlier enlarged specified size.
+        // Measure the current font every time so DPI/text changes and resize cycles are reversible.
+        var text=TextRenderer.MeasureText(Text,Font,Size.Empty,TextFormatFlags.SingleLine|TextFormatFlags.NoPrefix);
+        return new Size(Math.Max(MinimumSize.Width,text.Width+Padding.Horizontal+LayoutSize.Px(this,16)),
+            Math.Max(MinimumSize.Height,text.Height+Padding.Vertical+LayoutSize.Px(this,10)));
+    }
+}
+internal sealed class ExactWeightBox : TextBox
+{
+    public override Size GetPreferredSize(Size proposedSize)
+    {
+        var natural=base.GetPreferredSize(proposedSize);
+        int width=Math.Max(LayoutSize.Px(this,124),TextRenderer.MeasureText("99999",Font).Width+LayoutSize.Px(this,10));
+        return new Size(width,natural.Height);
+    }
+}

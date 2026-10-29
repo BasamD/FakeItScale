@@ -24,11 +24,6 @@ internal static class Program
                             ? Path.GetDirectoryName(Path.GetFullPath(args[screenshotArg+1]))!
                             : Path.Combine(Path.GetTempPath(),"ScaleSim-UI-checks");
                         await form.RunUiChecks(previewFolder);
-                        if(screenshotArg>=0 && screenshotArg+1<args.Length) {
-                            using var bitmap=new Bitmap(form.Width,form.Height);
-                            form.DrawToBitmap(bitmap,new Rectangle(0,0,form.Width,form.Height));
-                            bitmap.Save(args[screenshotArg+1],System.Drawing.Imaging.ImageFormat.Png);
-                        }
                     } catch(Exception ex) { smokeError=ex; }
                     form.Close();
                 };

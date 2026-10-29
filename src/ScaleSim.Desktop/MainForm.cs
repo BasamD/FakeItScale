@@ -14,7 +14,7 @@ public sealed class MainForm : Form
     readonly CheckBox hex = new() { Text = "Hex bytes", AutoSize = true };
     readonly CheckBox reduceMotion = new() { Text = "Reduce motion", AutoSize = true };
     readonly CheckBox showLog = new() { Text = "Show transmission log", AutoSize = true };
-    readonly TextBox manual = new() { Text = "20000", Width = 124, Font = Theme.Font(15, true) };
+    readonly TextBox manual = new ExactWeightBox() { Text = "20000", Width = 124, Font = Theme.Font(15, true) };
     readonly TextBox peer = new() { Width = 124, PlaceholderText = "e.g. COM11" };
     readonly TextBox address = new() { Text = "127.0.0.1", Width = 134, ReadOnly = true };
     readonly NumericUpDown port = Number(10001, 1, 65535);
@@ -63,7 +63,7 @@ public sealed class MainForm : Form
     static NumericUpDown Number(int value, int min, int max) => new() { Maximum = max, Minimum = min, Value = value, Width = 116, ThousandsSeparator = true };
     static Button Button(string text, Action? action = null, bool primary = false)
     {
-        var b = new Button { Text = text, AutoSize = true, MinimumSize = new Size(80, 34), Padding = new Padding(10, 2, 10, 2), FlatStyle = FlatStyle.Flat, Cursor = Cursors.Hand, Margin = new Padding(0, 0, 8, 6) };
+        var b = new ActionButton { Text = text, AutoSize = false, MinimumSize = new Size(80, 34), Padding = new Padding(10, 2, 10, 2), FlatStyle = FlatStyle.Flat, Cursor = Cursors.Hand, Margin = new Padding(0, 0, 8, 6) };
         b.FlatAppearance.BorderColor = primary ? Theme.Accent : Theme.Border;
         b.BackColor = primary ? Theme.Accent : Color.White; b.ForeColor = primary ? Color.White : Theme.Ink;
         if(primary) b.EnabledChanged+=(_,_)=> {
@@ -456,6 +456,7 @@ public sealed class MainForm : Form
     async Task CheckResponsiveLayouts()
     {
         var original=ClientSize;
+        var originalMaximum=MaximumSize; MaximumSize=new Size(4000,8000);
         var fonts=Descendants(root).ToDictionary(c=>c,c=>c.Font);
         var temporaryFonts=new List<Font>();
         try {
@@ -468,6 +469,7 @@ public sealed class MainForm : Form
                 foreach(int width in new[]{1280,640,800,1000,1280})
                 {
                     ClientSize=new Size(width,800);
+                    if(ClientSize.Width!=width) throw new InvalidOperationException($"Requested viewport {width}, got {ClientSize.Width}.");
                     foreach(bool automatic in new[]{false,true})
                     {
                         if(automatic) ApplyAuto(); else Preset(20000);
@@ -486,16 +488,23 @@ public sealed class MainForm : Form
         finally {
             foreach(var pair in fonts) pair.Key.Font=pair.Value;
             foreach(var font in temporaryFonts) font.Dispose();
-            ClientSize=original; transport.SelectedIndex=0; showLog.Checked=false;
+            MaximumSize=originalMaximum; ClientSize=original; transport.SelectedIndex=0; showLog.Checked=false;
             Preset(20000); layoutDirty=true; Reflow(); scroll.AutoScrollPosition=Point.Empty;
         }
     }
     void SavePreview(string name)
     {
-        layoutDirty=true; Reflow();
-        using var image=new Bitmap(Width,Height);
-        DrawToBitmap(image,new Rectangle(0,0,Width,Height));
-        image.Save(Path.Combine(uiCheckFolder,name),System.Drawing.Imaging.ImageFormat.Png);
+        var original=ClientSize; var originalMaximum=MaximumSize;
+        try {
+            MaximumSize=new Size(4000,8000);
+            scroll.AutoScrollPosition=Point.Empty;
+            layoutDirty=true; Reflow();
+            ClientSize=new Size(original.Width,root.Height+LayoutSize.Px(this,36));
+            layoutDirty=true; Reflow();
+            using var image=new Bitmap(Width,Height);
+            DrawToBitmap(image,new Rectangle(0,0,Width,Height));
+            image.Save(Path.Combine(uiCheckFolder,name),System.Drawing.Imaging.ImageFormat.Png);
+        } finally { MaximumSize=originalMaximum; ClientSize=original; layoutDirty=true; Reflow(); }
     }
     protected override void Dispose(bool disposing)
     {

@@ -7,8 +7,16 @@ $entries = @(Get-ChildItem artifacts -Filter 'Preview*.png' | Sort-Object Name |
     "100644 blob $blob`t$($_.Name)"
 })
 if ($entries.Count -eq 0) { throw 'No Windows previews were produced.' }
-$tree = ($entries -join "`n") | git mktree
-if ($LASTEXITCODE -ne 0) { throw 'Could not assemble preview tree.' }
+$start = [System.Diagnostics.ProcessStartInfo]::new('git', 'mktree')
+$start.RedirectStandardInput = $true
+$start.RedirectStandardOutput = $true
+$start.UseShellExecute = $false
+$process = [System.Diagnostics.Process]::Start($start)
+$process.StandardInput.Write(($entries -join "`n") + "`n")
+$process.StandardInput.Close()
+$tree = $process.StandardOutput.ReadToEnd().Trim()
+$process.WaitForExit()
+if ($process.ExitCode -ne 0) { throw 'Could not assemble preview tree.' }
 $remote = git ls-remote --heads origin ui-previews
 if ($LASTEXITCODE -ne 0) { throw 'Could not inspect preview branch.' }
 $commitArgs = @('-c', 'user.name=ScaleSim build', '-c', 'user.email=scalesim-build@users.noreply.github.com', 'commit-tree', $tree, '-m', "Windows UI previews for $env:GITHUB_SHA")
