@@ -9,15 +9,29 @@ internal static class Program
         {
             Application.SetUnhandledExceptionMode(UnhandledExceptionMode.ThrowException);
             ApplicationConfiguration.Initialize();
-            using var form = new MainForm();
+            using var form = new MainForm(persistPreferences: !smoke);
             bool shown = false;
+            Exception? smokeError = null;
             using var timer = new System.Windows.Forms.Timer { Interval = 250 };
             if(smoke)
             {
                 form.Shown += (_,_) => { shown = form.Visible && form.IsHandleCreated; timer.Start(); };
-                timer.Tick += (_,_) => { timer.Stop(); form.Close(); };
+                timer.Tick += async (_,_) => {
+                    timer.Stop();
+                    try {
+                        await form.RunUiChecks();
+                        int screenshotArg=Array.IndexOf(args,"--screenshot");
+                        if(screenshotArg>=0 && screenshotArg+1<args.Length) {
+                            using var bitmap=new Bitmap(form.Width,form.Height);
+                            form.DrawToBitmap(bitmap,new Rectangle(0,0,form.Width,form.Height));
+                            bitmap.Save(args[screenshotArg+1],System.Drawing.Imaging.ImageFormat.Png);
+                        }
+                    } catch(Exception ex) { smokeError=ex; }
+                    form.Close();
+                };
             }
             Application.Run(form);
+            if(smokeError != null) throw new InvalidOperationException("Windows UI smoke checks failed.",smokeError);
             if(smoke && !shown) throw new InvalidOperationException("The main window did not become visible.");
             return 0;
         }

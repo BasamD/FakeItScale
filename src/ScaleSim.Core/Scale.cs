@@ -40,6 +40,15 @@ public sealed class WeightEngine
     public AutoSettings Settings { get { lock(gate) return settings; } }
     public ScaleState State { get { lock(gate) return new(weight, repeated, settings.Repeats, completed, automatic, paused); } }
     public void Configure(AutoSettings value) { value.Validate(); lock(gate) { settings = value; ResetLocked(); } }
+    public void StartAutomatic(AutoSettings value)
+    {
+        value.Validate();
+        lock(gate) { settings = value; automatic = true; ResetLocked(); }
+    }
+    public void SetInterval(int milliseconds)
+    {
+        lock(gate) { var updated = settings with { IntervalMs = milliseconds }; updated.Validate(); settings = updated; }
+    }
     public void Manual(int value) { FrameEncoder.Encode(value); lock(gate) { automatic = false; weight = value; repeated = 0; version++; } }
     public void Automatic() { lock(gate) { automatic = true; ResetLocked(); } }
     public void Reset() { lock(gate) ResetLocked(); }
@@ -62,6 +71,6 @@ public sealed class WeightEngine
     // Commit only after a complete transport write; stale writes cannot advance a changed session.
     public void Commit(FrameTicket ticket)
     {
-        lock(gate) { if(ticket.Version != version) return; completed++; repeated++; }
+        lock(gate) { if(ticket.Version != version) return; completed++; if(repeated < int.MaxValue) repeated++; }
     }
 }

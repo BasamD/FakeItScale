@@ -1,6 +1,6 @@
 # Windows 11 acceptance checklist
 
-Build validation in Linux: 10 automated checks passed, including actual loopback TCP sends, reconnect, no-client freeze, and occupied-port handling. Self-contained win-x64 publish succeeded. The Windows publish script also launches the packaged executable, checks that the main window appears, and closes it cleanly. Full interactive UI behavior, actual WasteWORKS capture, physical/virtual serial operation, and code signing still require manual verification.
+Build validation in Linux: 16 automated checks passed, including actual loopback TCP sends, reconnect, no-client freeze, and occupied-port handling. Self-contained win-x64 publish succeeded. The Windows publish script also launches the packaged executable, tests the dial/presets and invalid mode drafts, opens a real TCP connection through the UI, verifies a live dial change reaches the stream, checks stop cleanup, and captures Preview.png. Full interactive UI behavior, actual WasteWORKS capture, physical/virtual serial operation, and code signing still require manual verification.
 
 1. Extract the portable ZIP and launch ScaleSim.exe on Windows 11 x64. Confirm window scaling, layout, keyboard input, and SIMULATION / TEST ONLY indicator.
 2. Choose Automatic with default values and Start connection. From PowerShell run `./Test-Tcp.ps1` (provided beside the executable) to check 21 exact frames: ten at 20,000, ten at 19,980, then 19,960. Restart the automatic cycle before each test.
@@ -9,7 +9,10 @@ Build validation in Linux: 10 automated checks passed, including actual loopback
 5. Set start 100, minimum 60, decrement 20, repeats 10; reset. Confirm 100 × 10, 80 × 10, 60 × 10, 100 × 10. Set minimum 65 and verify 100, 80, 100 without a below-minimum frame.
 6. Check invalid manual values (-1, 1.5, 100000), invalid automatic minimum > start, and invalid counts/intervals. Error handling must preserve a usable app.
 7. Test a busy TCP port and missing/busy COM port; resolve the conflict, stop and reconnect. Close while streaming and confirm a clean exit.
-8. Reopen and verify preferences. Check the log remains bounded to 500 rows.
+8. Drag the manual dial and verify that the selected weight reaches the next scheduled frame. Check zero and 99,999 endpoints, presets, ±20 buttons, keyboard arrows, page keys, and exact entry. Toggle Manual/Automatic with an invalid draft and confirm the selected mode still matches actual output.
+9. During an automatic hold, change the interval and click Apply. The current weight and repeat count must be preserved. Disconnect a paused client at a 60-second interval and confirm a new client connects promptly.
+10. Reopen and verify preferences, including Reduce motion and Show transmission log. Try closing with an invalid unapplied draft and confirm the next launch retains the last valid applied configuration. Check the log remains bounded to 500 rows.
+11. Verify the truck follows positive/zero transmitted weights in both modes, freezes on Pause, and stays still with Reduce motion. Its illustration is not proof of a WasteWORKS capture. Check the layout at 100%, 125%, 150%, and 200% display scaling; smaller windows should scroll instead of losing controls.
 
 ## WasteWORKS
 

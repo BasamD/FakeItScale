@@ -29,16 +29,18 @@ public sealed class TcpScaleServer : IAsyncDisposable
                 client.NoDelay = true;
                 engine.Reconnected();
                 Status?.Invoke("Connected: " + client.Client.RemoteEndPoint);
+                using var session = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                using var stream = client.GetStream();
+                // Observe peer EOF independently of the frame interval, including while paused.
+                var peer = WatchPeer(stream, session);
                 try
                 {
-                    using var stream = client.GetStream();
-                    while(!ct.IsCancellationRequested)
+                    while(!session.IsCancellationRequested)
                     {
-                        if(client.Client.Poll(0, SelectMode.SelectRead) && client.Client.Available == 0) break;
                         var ticket = engine.Next();
                         if(ticket != null)
                         {
-                            using var writeTimeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                            using var writeTimeout = CancellationTokenSource.CreateLinkedTokenSource(session.Token);
                             writeTimeout.CancelAfter(TimeSpan.FromSeconds(3));
                             await stream.WriteAsync(ticket.Bytes, writeTimeout.Token);
                             engine.Commit(ticket);
@@ -46,17 +48,31 @@ public sealed class TcpScaleServer : IAsyncDisposable
                             Status?.Invoke("Streaming");
                         }
                         else Status?.Invoke("Paused");
-                        await Task.Delay(engine.Settings.IntervalMs, ct);
+                        await FrameClock.Wait(engine, session.Token);
                     }
                 }
                 catch(Exception ex) when(ex is IOException or SocketException or OperationCanceledException)
-                { if(!ct.IsCancellationRequested) Status?.Invoke("Disconnected: " + ex.Message); }
-                Status?.Invoke("Disconnected");
+                {
+                    if(!ct.IsCancellationRequested && !session.IsCancellationRequested)
+                        Status?.Invoke("Disconnected: " + ex.Message);
+                }
+                finally { session.Cancel(); await peer; }
+                if(!ct.IsCancellationRequested) Status?.Invoke("Disconnected");
             }
         }
         catch(OperationCanceledException) when(ct.IsCancellationRequested) { }
         catch(SocketException) when(ct.IsCancellationRequested) { }
         catch(Exception ex) { Status?.Invoke("Error: " + ex.Message); }
+    }
+    static async Task WatchPeer(NetworkStream stream, CancellationTokenSource session)
+    {
+        try
+        {
+            var ignored = new byte[256];
+            while(await stream.ReadAsync(ignored, session.Token) != 0) { }
+        }
+        catch(Exception ex) when(ex is IOException or SocketException or OperationCanceledException) { }
+        finally { session.Cancel(); }
     }
     public async ValueTask DisposeAsync()
     {

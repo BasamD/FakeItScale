@@ -26,7 +26,7 @@ sealed class SerialTransport : IAsyncDisposable
                         port.Write(ticket.Bytes, 0, ticket.Bytes.Length);
                         engine.Commit(ticket); sent(ticket); status("Streaming (serial write completed)");
                     } else status("Paused");
-                    await Task.Delay(engine.Settings.IntervalMs, stop.Token);
+                    await FrameClock.Wait(engine, stop.Token);
                 }
             }
             catch(OperationCanceledException) when(stop.IsCancellationRequested) { }

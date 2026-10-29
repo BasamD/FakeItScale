@@ -82,5 +82,76 @@ await TestAsync("Occupied port rejected and cleanup safe", async () => {
     try { b.Start(); } catch(SocketException) { return; }
     throw new Exception("Occupied port unexpectedly opened");
 });
+Test("Timing update preserves automatic hold, mode, and pause", () => {
+    var e=new WeightEngine(); e.StartAutomatic(new(100,60,20));
+    for(int i=0;i<7;i++) Send(e);
+    e.Pause(true); var before=e.State; e.SetInterval(10);
+    Equal(before,e.State); Equal(10,e.Settings.IntervalMs);
+    Reject(()=>e.SetInterval(0)); Equal(before,e.State);
+    e.Pause(false); for(int i=0;i<3;i++) Equal(100,Send(e).Weight); Equal(80,Send(e).Weight);
+});
+Test("Invalid automatic draft leaves the running session untouched", () => {
+    var e=new WeightEngine(); e.StartAutomatic(new(100,60,20)); Send(e); var before=e.State;
+    Reject(()=>e.StartAutomatic(new(100,101,20))); Equal(before,e.State);
+});
+Test("Pending activity stays bounded while accurate statistics retain every write", () => {
+    var monitor=new ActivityMonitor(8); var e=new WeightEngine();
+    for(int i=0;i<5000;i++) monitor.Sent(Send(e));
+    monitor.Notice("write failed",true);
+    Equal(5000L,monitor.Snapshot.Writes); Equal(70000L,monitor.Snapshot.Bytes); Equal(1L,monitor.Snapshot.Errors);
+    Equal(8,monitor.Drain().Length); Equal(0,monitor.Drain().Length);
+    monitor.Reset(); Equal(0L,monitor.Snapshot.Writes); Equal<FrameTicket?>(null,monitor.Snapshot.LastFrame);
+});
+await TestAsync("Timing changes shorten an existing long wait", async () => {
+    var e=new WeightEngine(); e.SetInterval(60000);
+    using var timeout=new CancellationTokenSource(2000);
+    var wait=FrameClock.Wait(e,timeout.Token);
+    await Task.Delay(60); e.SetInterval(10); await wait;
+});
+await TestAsync("Disconnect while paused with a 60-second interval accepts a new client promptly", async () => {
+    var e=new WeightEngine(); e.StartAutomatic(new(IntervalMs:60000));
+    int port=FreePort(); await using var server=new TcpScaleServer(e,port);
+    int connections=0;
+    var reconnected=new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+    server.Status+=s=> { if(s.StartsWith("Connected:") && Interlocked.Increment(ref connections)==2) reconnected.TrySetResult(); };
+    server.Start();
+    using(var client=new TcpClient()) {
+        await client.ConnectAsync(IPAddress.Loopback,port);
+        await ReadFrame(client.GetStream()); e.Pause(true);
+        // Unexpected inbound data must not mask EOF or block reconnection.
+        await client.GetStream().WriteAsync(new byte[]{65,66,67});
+    }
+    using var next=new TcpClient(); await next.ConnectAsync(IPAddress.Loopback,port);
+    await reconnected.Task.WaitAsync(TimeSpan.FromSeconds(2));
+    Equal(true,e.State.Paused); Equal(0,e.State.Repeated);
+    e.Pause(false); e.SetInterval(10);
+    Equal(Convert.ToHexString(FrameEncoder.Encode(20000)),Convert.ToHexString(await ReadFrame(next.GetStream())));
+});
+await TestAsync("TCP manual changes and automatic resume preserve complete stable frames", async () => {
+    var e=new WeightEngine(); e.SetInterval(30); e.Manual(20000);
+    int port=FreePort(); await using var server=new TcpScaleServer(e,port);
+    var atSeven=new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+    server.Sent+=_=> { if(e.State.Automatic && e.State.Repeated==7) { e.Pause(true); atSeven.TrySetResult(); } };
+    server.Start();
+    using var client=new TcpClient(); await client.ConnectAsync(IPAddress.Loopback,port);
+    for(int i=0;i<3;i++) Equal(Convert.ToHexString(FrameEncoder.Encode(20000)),Convert.ToHexString(await ReadFrame(client.GetStream())));
+    e.Manual(12000); bool changed=false;
+    for(int i=0;i<5;i++) {
+        var frame=Convert.ToHexString(await ReadFrame(client.GetStream()));
+        if(frame==Convert.ToHexString(FrameEncoder.Encode(12000))) { changed=true; break; }
+        Equal(Convert.ToHexString(FrameEncoder.Encode(20000)),frame);
+    }
+    Equal(true,changed);
+    e.Pause(true); await Task.Delay(100);
+    // Drain complete frames written before pause; then restart at an exact, known boundary.
+    while(client.Available>=14) await ReadFrame(client.GetStream());
+    e.StartAutomatic(new(100,60,20,10,30)); e.Pause(false);
+    for(int i=0;i<7;i++) Equal(Convert.ToHexString(FrameEncoder.Encode(100)),Convert.ToHexString(await ReadFrame(client.GetStream())));
+    await atSeven.Task.WaitAsync(TimeSpan.FromSeconds(2)); await Task.Delay(80); Equal(7,e.State.Repeated); Equal(0,client.Available);
+    e.Pause(false);
+    for(int i=0;i<3;i++) Equal(Convert.ToHexString(FrameEncoder.Encode(100)),Convert.ToHexString(await ReadFrame(client.GetStream())));
+    Equal(Convert.ToHexString(FrameEncoder.Encode(80)),Convert.ToHexString(await ReadFrame(client.GetStream())));
+});
+
 Console.WriteLine($"{passed} passed; {failed} failed");
 return failed==0 ? 0 : 1;
